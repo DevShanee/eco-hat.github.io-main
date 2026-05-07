@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ECO-HAT | Admin Portal</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <style>
+        :root { 
+            --primary-red: #8B0000; 
+            --gold: #DAA520; 
+            --silver: #A9A9A9;
+            --bronze: #CD7F32;
+            --bg: #f4f7f6; 
+            --card-shadow: 0 4px 20px rgba(0,0,0,0.08); 
+        }
+        body { background: var(--bg); margin: 0; font-family: 'Segoe UI', system-ui, sans-serif; }
+        header { background: var(--primary-red); color: white; padding: 15px 40px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .logout-btn { background: rgba(255,255,255,0.15); border: 1px solid white; border-radius: 5px; color: white; padding: 8px 20px; cursor: pointer; font-size: 0.85rem; }
+        .admin-container { padding: 30px; max-width: 1300px; margin: auto; display: flex; flex-direction: column; gap: 25px; }
+        
+        .analytics-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+        .middle-row { display: grid; grid-template-columns: 1fr 2fr; gap: 25px; }
+        
+        .stat-card { background: white; padding: 25px; border-radius: 15px; box-shadow: var(--card-shadow); border-top: 5px solid var(--primary-red); }
+        .stat-card h1 { margin: 10px 0 0; font-size: 2.5rem; color: var(--primary-red); }
+        
+        .card { background: white; padding: 25px; border-radius: 15px; box-shadow: var(--card-shadow); min-height: 350px; display: flex; flex-direction: column; }
+        
+        /* Leaderboard Specific Styles */
+        .search-filter-row { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; }
+        .search-filter-row input, .search-filter-row select { padding: 8px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 0.9rem; outline: none; }
+        .search-filter-row input:focus { border-color: var(--gold); }
+
+        .lb-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        .lb-table th { text-align: left; background: #f9f9f9; padding: 12px; color: #666; font-size: 0.75rem; text-transform: uppercase; border-bottom: 2px solid #eee; }
+        .lb-table td { padding: 12px; border-bottom: 1px solid #eee; font-size: 0.9rem; vertical-align: middle; }
+        
+        .rank-badge { width: 25px; height: 25px; display: flex; align-items: center; justify-content: center; border-radius: 50%; font-weight: bold; color: white; font-size: 0.8rem; }
+        .rank-1 { background: var(--gold); box-shadow: 0 0 10px rgba(218, 165, 32, 0.4); }
+        .rank-2 { background: var(--silver); }
+        .rank-3 { background: var(--bronze); }
+        .rank-default { background: #eee; color: #666; }
+
+        .level-pill { padding: 4px 10px; border-radius: 20px; font-size: 0.7rem; font-weight: bold; }
+        .lvl-beginner { background: #e8f5e9; color: #2e7d32; }
+        .lvl-guardian { background: #fff8e1; color: #ff8f00; }
+        .lvl-champion { background: #f3e5f5; color: #7b1fa2; }
+        .lvl-protector { background: #e1f5fe; color: #0277bd; }
+
+        .scanner-box { background: #1a1a1a; color: white; padding: 30px; border-radius: 20px; display: flex; flex-direction: column; align-items: center; }
+        
+        @media (max-width: 1000px) { .analytics-row, .middle-row { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <header>
+        <div style="display:flex; align-items:center; gap:12px;">
+            <span>♻️</span>
+            <h1 style="margin:0; font-size: 1.2rem;">ECO-HAT ADMIN</h1>
+        </div>
+        <button id="logout-btn" class="logout-btn">Logout</button>
+    </header>
+
+    <div class="admin-container">
+        <div class="analytics-row">
+            <div class="stat-card"><small>Bottles Collected Today</small><h1 id="total-day">0</h1></div>
+            <div class="stat-card"><small>Weekly Performance</small><h1 id="total-week">0</h1></div>
+            <div class="stat-card"><small>Total Monthly Intake</small><h1 id="total-month">0</h1></div>
+        </div>
+
+        <div class="middle-row">
+            <div class="card" id="inventory-card">
+                <div style="display:flex; justify-content:space-between; border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 15px;">
+                    <h3 style="margin:0;">📦 Inventory Stock</h3>
+                    <span id="edit-stock-toggle" style="font-size: 0.7rem; color: var(--gold); cursor:pointer;" onclick="toggleEdit()">Edit Stock</span>
+                </div>
+                <div id="inventory-list"></div>
+                <div id="edit-controls" style="display: none; margin-top: 15px; border-top: 1px solid #eee; padding-top: 15px;">
+                    <button id="save-inventory-btn" style="background:var(--primary-red); color:white; border:none; padding:12px; border-radius:8px; width:100%; cursor:pointer; font-weight:bold;">Save All Changes</button>
+                </div>
+            </div>
+
+            <div class="card">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 15px;">
+                    <h3 style="margin:0;">🏆 Sustainability Leaderboard</h3>
+                    <span style="font-size: 0.7rem; color: #888;">Top 10 Students</span>
+                </div>
+                
+                <div class="search-filter-row">
+                    <input type="text" id="lb-search" placeholder="Search name or ID..." oninput="renderLeaderboard()">
+                    <select id="lb-sort" onchange="renderLeaderboard()">
+                        <option value="points">Sort by Eco Points</option>
+                        <option value="bottles">Sort by Bottles</option>
+                    </select>
+                </div>
+
+                <div style="overflow-x: auto;">
+                    <table class="lb-table">
+                        <thead>
+                            <tr>
+                                <th>Rank</th>
+                                <th>Student Name</th>
+                                <th>Student ID</th>
+                                <th>Bottles</th>
+                                <th>Points</th>
+                                <th>Level</th>
+                            </tr>
+                        </thead>
+                        <tbody id="db-list">
+                            </tbody>
+                    </table>
+                </div>
+            </div>
+        </div> 
+
+        <div class="card">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; flex-wrap: wrap; gap: 10px;">
+                <h3 style="margin:0;">💰 Full Sales Transparency System</h3>
+                <div id="log-summary" style="background:var(--bg); padding:10px 20px; border-radius:10px; border:1px solid #eee;">
+                    <small style="color:#666;">Total Verified Sales:</small>
+                    <strong id="total-sales-amt" style="color:var(--primary-red); font-size:1.2rem; margin-left:10px;">₱0.00</strong>
+                </div>
+            </div>
+            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap:15px; background:#f9f9f9; padding:20px; border-radius:12px; margin-bottom:20px;">
+                <div style="display:flex; flex-direction:column; gap:5px;">
+                    <label style="font-size:0.8rem; font-weight:bold;">Amount (₱)</label>
+                    <input id="new-log-amt" type="number" placeholder="0.00" step="0.01" style="padding:10px; border:1px solid #ddd; border-radius:5px;">
+                </div>
+                <div style="display:flex; flex-direction:column; gap:5px;">
+                    <label style="font-size:0.8rem; font-weight:bold;">Description</label>
+                    <input id="new-log-desc" type="text" placeholder="e.g. Bottles Sold" style="padding:10px; border:1px solid #ddd; border-radius:5px;">
+                </div>
+                <div style="display:flex; flex-direction:column; gap:5px;">
+                    <label style="font-size:0.8rem; font-weight:bold;">Receipt Proof</label>
+                    <input type="file" id="receipt-upload" accept="image/*">
+                </div>
+                <button onclick="submitNewLog()" style="background:var(--primary-red); color:white; border:none; padding:10px; border-radius:8px; cursor:pointer; align-self:flex-end; font-weight:bold; height: 45px;">➕ Log Transaction</button>
+            </div>
+            <div id="transparency-list" style="display:flex; flex-direction:column; gap:10px; max-height:400px; overflow-y:auto;"></div>
+        </div>
+
+        <div class="scanner-box">
+            <h2 style="margin:0; color:var(--gold);">📷 LIVE SCANNER</h2>
+            <p style="font-size:0.7rem; opacity:0.5; margin-bottom: 15px;">Awaiting QR Code...</p>
+            <div id="reader" style="width: 100%; max-width: 500px; background: black; border-radius: 15px; overflow: hidden;"></div>
+        </div>
+    </div> 
+
+    <script type="module">
+    import Storage from './js/services/Storage.js';
+    const API_BASE = "https://ecohat-fastapi.onrender.com";
+
+    let isEditing = false;
+    let currentStockData = [];
+    let studentsData = [];
+
+    window.onload = () => {
+        loadInventory();
+        renderTransparencyLogs();
+        updateAnalytics(); 
+        loadLeaderboard();
+        
+        const html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 }, false);
+        html5QrcodeScanner.render(onScanSuccess);
+    };
+
+    document.getElementById('logout-btn').addEventListener('click', () => {
+        Storage.logout();
+        window.location.href = 'index.html';
+    });
+
+    // --- LEADERBOARD LOGIC ---
+    async function loadLeaderboard() {
+        try {
+            // Fetch all users from your database/Storage
+            // Assuming Storage.getAllUsers() or similar exists
+            studentsData = await Storage.getAllStudents(); 
+            renderLeaderboard();
+        } catch (e) { console.error("Leaderboard load failed", e); }
+    }
+
+    function getSustainLevel(points) {
+        if (points >= 3000) return { label: "Planet Protector", class: "lvl-protector" };
+        if (points >= 1500) return { label: "Sustainability Champion", class: "lvl-champion" };
+        if (points >= 500) return { label: "Green Guardian", class: "lvl-guardian" };
+        return { label: "Eco Beginner", class: "lvl-beginner" };
+    }
+
+    window.renderLeaderboard = () => {
+        const list = document.getElementById('db-list');
+        const searchTerm = document.getElementById('lb-search').value.toLowerCase();
+        const sortBy = document.getElementById('lb-sort').value;
+
+        // Sorting
+        let sorted = [...studentsData].sort((a, b) => {
+            if (sortBy === 'points') return b.points - a.points;
+            if (sortBy === 'bottles') return b.bottles_collected - a.bottles_collected;
+        });
+
+        // Filtering
+        let filtered = sorted.filter(s => 
+            s.name.toLowerCase().includes(searchTerm) || 
+            s.student_id.includes(searchTerm)
+        ).slice(0, 10); // Top 10
+
+        list.innerHTML = filtered.map((student, index) => {
+            const level = getSustainLevel(student.points);
+            const rankClass = index === 0 ? 'rank-1' : (index === 1 ? 'rank-2' : (index === 2 ? 'rank-3' : 'rank-default'));
+            
+            return `
+                <tr>
+                    <td><div class="rank-badge ${rankClass}">${index + 1}</div></td>
+                    <td><strong>${student.name}</strong></td>
+                    <td style="color:#666;">${student.student_id}</td>
+                    <td style="text-align:center;">${student.bottles_collected || 0}</td>
+                    <td style="font-weight:bold; color:var(--primary-red);">${student.points}</td>
+                    <td><span class="level-pill ${level.class}">${level.label}</span></td>
+                </tr>
+            `;
+        }).join('');
+    };
+
+    // --- INVENTORY ---
+    async function loadInventory() {
+        try {
+            const data = await Storage.getInventory(); 
+            currentStockData = data || []; 
+            renderInventory();
+        } catch (e) { console.error("Inventory load failed", e); }
+    }
+
+    function renderInventory() {
+        const listContainer = document.getElementById('inventory-list');
+        listContainer.innerHTML = currentStockData.map((item, index) => isEditing ? 
+            `<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <span style="font-size:0.9rem;">${item.name}</span>
+                <input type="number" class="stock-input" data-index="${index}" value="${item.quantity}" style="width: 70px; padding: 5px; border-radius: 5px; border: 1px solid var(--primary-red); text-align:center;">
+            </div>` : 
+            `<div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                <span style="font-size:0.9rem;">${item.name}</span>
+                <span style="font-weight:bold; color:var(--primary-red);">${item.quantity}</span>
+            </div>`).join('');
+    }
+
+    window.toggleEdit = () => {
+        isEditing = !isEditing;
+        document.getElementById('edit-stock-toggle').textContent = isEditing ? "Cancel" : "Edit Stock";
+        document.getElementById('edit-controls').style.display = isEditing ? "block" : "none";
+        renderInventory();
+    };
+
+    document.getElementById('save-inventory-btn').addEventListener('click', async () => {
+        const inputs = document.querySelectorAll('.stock-input');
+        const updatedItems = Array.from(inputs).map(input => ({
+            id: currentStockData[input.dataset.index].id,
+            quantity: parseInt(input.value)
+        }));
+        try {
+            await Storage.updateInventory(updatedItems); 
+            alert("✅ Inventory Updated!");
+            toggleEdit();
+            loadInventory();
+        } catch (e) { alert("❌ Failed: " + e.message); }
+    });
+
+    // --- ANALYTICS ---
+    async function updateAnalytics() {
+        try {
+            const response = await fetch(`${API_BASE}/admin/analytics`);
+            const data = await response.json();
+            document.getElementById('total-day').textContent = data.today;
+            document.getElementById('total-week').textContent = data.week;
+            document.getElementById('total-month').textContent = data.month;
+        } catch (error) { console.error("Error fetching analytics:", error); }
+    }
+
+    // --- SCANNER ---
+    function onScanSuccess(decodedText) {
+        if (confirm(`Approve redemption?`)) {
+            Storage.processRedemption(decodedText)
+                .then(() => {
+                    alert("✅ Supplies redeemed successfully!");
+                    location.reload(); 
+                })
+                .catch(err => alert("❌ Error: " + err.message));
+        }
+    }
+
+    // Transparency logic remains same as provided...
+    async function renderTransparencyLogs() {
+        const listContainer = document.getElementById('transparency-list');
+        const totalEl = document.getElementById('total-sales-amt');
+        try {
+            const totalRes = await fetch(`${API_BASE}/admin/total-sales`);
+            const totalData = await totalRes.json();
+            totalEl.textContent = `₱${totalData.total_sales.toFixed(2)}`;
+            const logsRes = await fetch(`${API_BASE}/admin/logs`);
+            const data = await logsRes.json();
+            listContainer.innerHTML = data.logs.map(log => `
+                <div style="display:flex; align-items:center; justify-content:space-between; background:white; padding:12px; border-radius:10px; border-left: 4px solid var(--gold); box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
+                    <div style="display:flex; align-items:center; gap:15px;">
+                        ${log.receipt ? `<img src="${log.receipt}" onclick="window.open(this.src)" style="width:40px; height:40px; border-radius:5px; cursor:zoom-in; object-fit:cover;">` : `<div style="width:40px; height:40px; background:#eee; border-radius:5px;"></div>`}
+                        <div><div style="font-weight:bold; font-size:0.9rem;">${log.description}</div><div style="font-size:0.7rem; color:#888;">📅 ${new Date(log.timestamp).toLocaleDateString()}</div></div>
+                    </div>
+                    <div style="text-align:right;"><div style="color:var(--primary-red); font-weight:bold;">₱${parseFloat(log.amount).toFixed(2)}</div></div>
+                </div>`).join('');
+        } catch (e) { console.error(e); }
+    }
+    </script>
+</body>
+</html>
