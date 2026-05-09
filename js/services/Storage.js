@@ -5,10 +5,16 @@ export default class Storage {
      * Authenticated User Management
      */
     static async register(user) {
+        // Ensure the ID is mapped to 'student_id' if your backend requires that specific field name
+        const payload = {
+            ...user,
+            student_id: user.student_id || user.id || user.studentNumber
+        };
+
         const response = await fetch(`${this.API_URL}/register`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(user)
+            body: JSON.stringify(payload)
         });
         if (!response.ok) {
             const errorData = await response.json();
@@ -66,7 +72,6 @@ export default class Storage {
 
     /**
      * Fetches all registered students for the Leaderboard
-     * Maps the API response to include calculated fields like bottle count
      */
     static async getAllStudents() {
         try {
@@ -75,7 +80,6 @@ export default class Storage {
             
             const students = await response.json();
             
-            // Sort by points descending and add a derived bottle count (assuming 5pts/bottle)
             return students
                 .map(s => ({
                     ...s,
@@ -88,10 +92,6 @@ export default class Storage {
         }
     }
 
-    /**
-     * Calculates specific ranking for the logged-in student
-     * Used for "Nearby Competitor" logic on the dashboard
-     */
     static async getStudentRank(studentId) {
         const allStudents = await this.getAllStudents();
         const index = allStudents.findIndex(s => s.student_id === studentId || s.id === studentId);
@@ -101,7 +101,6 @@ export default class Storage {
         return {
             position: index + 1,
             totalStudents: allStudents.length,
-            // Competitive logic: The person immediately above them in rank
             competitor: index > 0 ? allStudents[index - 1] : null 
         };
     }
